@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BuscaminasV3</title>
+    <style>
+      #fondo {
+        display: grid;
+        gap: 2px;
+        margin-top: 10px;
+      }
+      .casilla {
+        width: 30px;
+        height: 30px;
+        background-image: url("tapa.jpg");
+        background-size: cover;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        font-weight: bold;
+        border: 1px solid black;
+        cursor: pointer;
+      }
+      .mina {
+        background-image: url("tapabomba.jpg");
+      }
+      .numero {
+        background-image: url("tapaabierta.jpg");
+        color: white;
+      }
+      .descubierta {
+        background-image: url("tapaabierta.jpg");
+      }
+      .bandera {
+        background-image: url("tapabandera.jpg");
+      }
+    </style>
+  </head>
+  <body>
+    <h1>BuscaminasV3</h1>
+    <div id="controles">
+      <button class="boton" onclick="iniciarFacil()">Fácil</button>
+      <button class="boton" onclick="iniciarMedio()">Medio</button>
+      <button class="boton" onclick="iniciarDificil()">Difícil</button>
+    </div>
+    <div id="tiempo" class="info">Tiempo: 0</div>
+    <div id="clicks" class="info">Clicks: 0</div>
+    <div id="vidas" class="info">Vidas: 3</div>
+    <div id="ayuda" class="info">Ayudas: 3</div>
+
+    <div id="fondo"></div>
+
+    <script>
+      let filas, columnas, minas;
+      let tablero = [];
+      let tiempo = 0;
+      let clicks = 0;
+      let vidas = 3;
+      let ayudas = 3;
+      let intervaloTiempo;
+      let tiempoIniciado = false;
+      let minasColocadas = false;
+
+      function generarTablero() {
+        let fondo = document.getElementById("fondo");
+        fondo.innerHTML = "";
+        fondo.style.gridTemplateColumns = `repeat(${columnas}, 30px)`;
+        fondo.style.gridTemplateRows = `repeat(${filas}, 30px)`;
+
+        // Crear el tablero usando un enfoque más explícito
+        tablero = [];
+        for (let i = 0; i < filas; i++) {
+          tablero[i] = [];
+          for (let j = 0; j < columnas; j++) {
+            tablero[i][j] = 0;
+          }
+        }
+
+        for (let i = 0; i < filas; i++) {
+          for (let j = 0; j < columnas; j++) {
+            let casilla = document.createElement("div");
+            casilla.classList.add("casilla");
+            casilla.id = `${i}-${j}`;
+            casilla.dataset.fila = i;
+            casilla.dataset.columna = j;
+            casilla.addEventListener("click", (e) => manejarClick(e, i, j));
+            casilla.addEventListener("mousedown", (e) => ayuda(e));
+            casilla.addEventListener("contextmenu", (e) => alternarBandera(e));
+            fondo.appendChild(casilla);
+          }
+        }
+
+        tiempo = 0;
+        clicks = 0;
+        vidas = 3;
+        ayudas = 3;
+        minasColocadas = false;
+        tiempoIniciado = false;
+        clearInterval(intervaloTiempo);
+        actualizarInterfaz();
+      }
+
+      function actualizarInterfaz() {
+        document.getElementById("tiempo").textContent = `Tiempo: ${tiempo}`;
+        document.getElementById("clicks").textContent = `Clicks: ${clicks}`;
+        document.getElementById("vidas").textContent = `Vidas: ${vidas}`;
+        document.getElementById("ayuda").textContent = `Ayudas: ${ayudas}`;
+      }
+
+      function colocarMinas(exceptFila, exceptCol) {
+        let minasRestantes = minas;
+        while (minasRestantes > 0) {
+          let fila = Math.floor(Math.random() * filas);
+          let columna = Math.floor(Math.random() * columnas);
+          if (
+            tablero[fila][columna] === 0 &&
+            (fila !== exceptFila || columna !== exceptCol)
+          ) {
+            tablero[fila][columna] = "M";
+            minasRestantes--;
+          }
+        }
+
+        for (let i = 0; i < filas; i++) {
+          for (let j = 0; j < columnas; j++) {
+            if (tablero[i][j] !== "M") {
+              tablero[i][j] = contarMinasAlrededor(i, j);
+            }
+          }
+        }
+      }
+
+      function iniciarFacil() {
+        filas = 5;
+        columnas = 5;
+        minas = 5;
+        generarTablero();
+      }
+
+      function iniciarMedio() {
+        filas = 10;
+        columnas = 10;
+        minas = 15;
+        generarTablero();
+      }
+
+      function iniciarDificil() {
+        filas = 15;
+        columnas = 15;
+        minas = 25;
+        generarTablero();
+      }
+
+      function contarMinasAlrededor(fila, col) {
+        let minasCercanas = 0;
+        for (let i = -1; i <= 1; i++) {
+          for (let j = -1; j <= 1; j++) {
+            let nuevaFila = fila + i;
+            let nuevaCol = col + j;
+            if (
+              nuevaFila >= 0 &&
+              nuevaFila < filas &&
+              nuevaCol >= 0 &&
+              nuevaCol < columnas
+            ) {
+              if (tablero[nuevaFila][nuevaCol] === "M") {
+                minasCercanas++;
+              }
+            }
+          }
+        }
+        return minasCercanas;
+      }
+
+      /*function manejarClick(event, fila, col) {
+        contarClick();
+        iniciarTiempo();
+        let casilla = event.target;
+
+        if (!minasColocadas) {
+          colocarMinas(fila, col);
+          minasColocadas = true;
+        }
+
+        if (tablero[fila][col] === "M") {
+          perder(casilla);
+        } else {
+          casilla.classList.add("numero");
+          casilla.textContent =
+            tablero[fila][col] > 0 ? tablero[fila][col] : "";
+          casilla.classList.add("descubierta");
+        }
+
+        casilla.style.pointerEvents = "none";
+        comprobarPartida();
+      }*/
+
+      function manejarClick(event, fila, col) {
+  contarClick();
+  iniciarTiempo();
+  let casilla = event.target;
+
+  if (!minasColocadas) {
+    colocarMinas(fila, col);
+    minasColocadas = true;
+  }
+
+  if (tablero[fila][col] === "M") {
+    perder(casilla);
+  } else if (tablero[fila][col] === 0) {
+    revelarCasillasVacias(fila, col);
+  } else {
+    casilla.classList.add("numero");
+    casilla.textContent = tablero[fila][col];
+    casilla.classList.add("descubierta");
+  }
+
+  casilla.style.pointerEvents = "none";
+  comprobarPartida();
+}
+
+      function iniciarTiempo() {
+        if (!tiempoIniciado) {
+          tiempoIniciado = true;
+          intervaloTiempo = setInterval(() => {
+            tiempo++;
+            document.getElementById("tiempo").textContent = `Tiempo: ${tiempo}`;
+          }, 1000);
+        }
+      }
+
+      function contarClick() {
+        clicks++;
+        document.getElementById("clicks").textContent = `Clicks: ${clicks}`;
+      }
+
+      function perder(casilla) {
+        vidas--;
+        tiempo += 30;
+        actualizarInterfaz();
+        casilla.classList.add("mina");
+
+        if (vidas === 0) {
+          setTimeout(() => {
+            alert("¡Has perdido!");
+            clearInterval(intervaloTiempo);
+            generarTablero();
+          }, 10);
+        }
+      }
+
+      function comprobarPartida() {
+        let descubiertas = document.querySelectorAll(".numero").length;
+        let totalSinMinas = filas * columnas - minas;
+
+        if (descubiertas === totalSinMinas) {
+          alert("¡Has ganado!");
+          clearInterval(intervaloTiempo);
+          generarTablero();
+          
+        }
+      }
+
+      function ayuda(event) {
+        if (tiempo > 0) {
+          if (event.button === 1 && ayudas > 0) {
+            ayudas--;
+
+            // Actualiza el contador de ayudas en la interfaz
+            document.getElementById("ayuda").textContent = `Ayudas: ${ayudas}`;
+
+            let casilla = event.target;
+            let fila = parseInt(casilla.dataset.fila);
+            let col = parseInt(casilla.dataset.columna);
+
+            let posicionesAdyacentes = [
+              [fila - 1, col - 1],
+              [fila, col - 1],
+              [fila + 1, col - 1],
+              [fila - 1, col],
+              [fila + 1, col],
+              [fila - 1, col + 1],
+              [fila, col + 1],
+              [fila + 1, col + 1],
+            ];
+
+            let estadoAnterior = {};
+            posicionesAdyacentes.forEach(([adjX, adjY]) => {
+              let idAdyacente = `${adjX}-${adjY}`;
+              let celdaAdyacente = document.getElementById(idAdyacente);
+              if (celdaAdyacente) {
+                estadoAnterior[idAdyacente] = {
+                  textContent: celdaAdyacente.textContent,
+                  classList: [...celdaAdyacente.classList],
+                };
+
+                if (tablero[adjX][adjY] === "M") {
+                  celdaAdyacente.classList.add("mina");
+                } else {
+                  celdaAdyacente.classList.add("descubierta");
+                  celdaAdyacente.classList.add("numero");
+                  if (tablero[adjX][adjY] > 0) {
+                    celdaAdyacente.textContent = tablero[adjX][adjY];
+                  } else {
+                    celdaAdyacente.textContent = "";
+                  }
+                }
+              }
+            });
+
+            setTimeout(() => {
+              posicionesAdyacentes.forEach(([adjX, adjY]) => {
+                let idAdyacente = `${adjX}-${adjY}`;
+                let celdaAdyacente = document.getElementById(idAdyacente);
+                if (celdaAdyacente && estadoAnterior[idAdyacente]) {
+                  celdaAdyacente.textContent =
+                    estadoAnterior[idAdyacente].textContent;
+                  celdaAdyacente.className = "casilla";
+                  celdaAdyacente.classList.add(
+                    ...estadoAnterior[idAdyacente].classList
+                  );
+                }
+              });
+            }, 3000);
+          }
+        }
+      }
+
+      function alternarBandera(event) {
+        event.preventDefault(); // Prevenir el menú contextual del navegador al hacer clic derecho.
+        let casilla = event.target;
+
+        // Solo permitir poner/quitar bandera si la casilla no está descubierta
+        if (!casilla.classList.contains("descubierta")) {
+          // Alternar entre la clase "bandera" y la clase "casilla"
+          if (casilla.classList.contains("bandera")) {
+            casilla.classList.remove("bandera"); // Eliminar la bandera
+          } else {
+            casilla.classList.add("bandera"); // Añadir la bandera
+          }
+        }
+      }
+
+      function revelarCasillasVacias(fila, col) {
+  let casilla = document.getElementById(`${fila}-${col}`);
+  
+  // Verifica si la casilla es válida y no ha sido descubierta
+  if (!casilla || casilla.classList.contains("descubierta")) {
+    return;
+  }
+
+  // Marcar como descubierta
+  casilla.classList.add("descubierta");
+  casilla.classList.add("numero");
+
+  // Si la casilla tiene un número, mostrarlo y detener la propagación
+  if (tablero[fila][col] > 0) {
+    casilla.textContent = tablero[fila][col];
+    return;
+  }
+
+  // Si es una casilla vacía, continuar revelando en cascada
+  let direcciones = [
+    [-1, -1], [-1, 0], [-1, 1],
+    [0, -1],          [0, 1],
+    [1, -1], [1, 0], [1, 1],
+  ];
+
+  for (let [dx, dy] of direcciones) {
+    let nuevaFila = fila + dx;
+    let nuevaCol = col + dy;
+    if (nuevaFila >= 0 && nuevaFila < filas && nuevaCol >= 0 && nuevaCol < columnas) {
+      revelarCasillasVacias(nuevaFila, nuevaCol);
+    }
+  }
+}      
+      // Deshabilitar el menú contextual (click derecho) en el navegador
+      document.addEventListener("contextmenu", (e) => e.preventDefault());
+    </script>
+  </body>
+</html>
